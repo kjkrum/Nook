@@ -1,0 +1,22 @@
+<resources>
+	<string name="app_name" translatable="false">TouchPDF</string>
+
+	<string name="opening">Opening&#8230;</string>
+	<string name="rendering">Rendering&#8230;</string>
+
+	<string name="error">Error</string>
+	<string name="error_opening">Error opening document.</string>
+	<string name="error_empty_document">The document is empty.</string>
+	<string name="error_rendering">Error rendering page.</string>
+	<!-- These should never be seen if the manifest is set up correctly. -->
+	<string name="error_uri_scheme">Unrecognized URI scheme.</string>
+	<string name="error_missing_uri">Missing document URI.</string>
+	<string name="error_bogus_intent">Missing or unrecognized intent.</string>
+
+	<string name="stretch">Stretch</string>
+	<string name="width">Width</string>
+	<string name="span">Span</string>
+	<string name="book">Book</string>
+	<string name="paper">Paper</string>
+	<string name="orientation">Orientation</string>
+</resources>

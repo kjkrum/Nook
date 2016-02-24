@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+			  	android:orientation="vertical"
+				android:background="#fff">
+
+	<RadioGroup
+		android:id="@+id/strategy_group"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:paddingBottom="20dp"
+		android:orientation="horizontal">
+
+		<!-- By default, radio buttons have some weird background that adds
+		 space to the left side.  Setting the background to @null fixes it. -->
+
+		<RadioButton
+			android:id="@+id/full_page"
+			android:button="@null"
+			android:drawableTop="@drawable/read_book"
+			android:drawableBottom="@android:drawable/btn_radio"
+			android:background="@null"
+			android:layout_width="0dp"
+			android:layout_weight="1"
+			android:layout_height="wrap_content"
+			android:gravity="center"/>
+
+		<RadioButton
+			android:id="@+id/two_column"
+			android:button="@null"
+			android:drawableTop="@drawable/read_paper"
+			android:drawableBottom="@android:drawable/btn_radio"
+			android:background="@null"
+			android:layout_width="0dp"
+			android:layout_weight="1"
+			android:layout_height="wrap_content"
+			android:gravity="center"/>
+	</RadioGroup>
+
+</LinearLayout>
