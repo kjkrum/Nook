@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,95 +19,23 @@ import android.widget.ImageView;
 import android.widget.PopupWindow;
 
 /**
- * TODO javadoc
+ * PDF viewer activity.
  *
  * @author Kevin Krumwiede
  */
 public class MainActivity extends AppCompatActivity {
 	private static final String TAG = MainActivity.class.getSimpleName();
+	private static final String SCHEME_FILE = "file";
 	private Handler mHandler;
 	private ImageView mImageView;
-	private Document mDocument;
-	private ReadingStrategyFactory mReadingStrategyFactory;
-	private ReadingStrategy mReadingStrategy;
-
-	private OpenAsync mOpenAsync;
-	private RenderAsync mRenderAsync;
-	private DialogFragment mWaitDialog;
 
 	@Override
 	protected void onCreate(@Nullable final Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
-		mHandler = new Handler(Looper.getMainLooper());
-		mImageView = (ImageView) findViewById(R.id.imageView);
-	}
-
-	@Override
-	protected void onResume() {
-		super.onResume();
-		openDocument();
-	}
-
-	@Override
-	protected void onPause() {
-		super.onPause();
-		if(mOpenAsync != null) {
-			mOpenAsync.cancel(true);
-			mOpenAsync = null;
-		}
-		if(mDocument != null) {
-			mDocument.close();
-			mDocument = null;
-		}
-		cancelRender();
-		recycleImageViewBitmap();
-	}
-
-	private void openDocument() {
-		final Intent intent = getIntent();
-		if(intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {
-			final Uri data = intent.getData();
-			if(data != null) {
-				if("file".equals(data.getScheme())) {
-					mWaitDialog = WaitDialog.show(MainActivity.this, R.string.opening);
-					mOpenAsync = Document.open(data.getPath(), new Callback<Document>() {
-						@Override
-						public void onResult(final Document result) {
-							dismissWaitDialog();
-							mOpenAsync = null;
-							prepareDocument(result);
-						}
-
-						@Override
-						public void onError(final Throwable error) {
-							dismissWaitDialog();
-							mOpenAsync = null;
-							ErrorDialog.show(MainActivity.this, R.string.error_opening, true);
-							if(error != null) {
-								Log.d(TAG, "file error", error);
-							}
-						}
-					});
-				}
-				// TODO handle "content" URIs
-				else {
-					ErrorDialog.show(this, R.string.error_uri_scheme, true);
-				}
-			}
-			else {
-				ErrorDialog.show(this, R.string.error_missing_uri, true);
-			}
-		}
-		else {
-			ErrorDialog.show(this, R.string.error_bogus_intent, true);
-		}
-	}
-
-	private void prepareDocument(@NonNull final Document document) {
-		if(document.getPageCount() > 0) {
-			document.setPage(0);
-			mDocument = document;
+		if(isFileIntent(getIntent())) {
+			setContentView(R.layout.activity_main);
+			mHandler = new Handler(Looper.getMainLooper());
+			mImageView = (ImageView) findViewById(R.id.imageView);
 			mImageView.setOnLongClickListener(new View.OnLongClickListener() {
 				@Override
 				public boolean onLongClick(final View v) {
@@ -116,12 +43,75 @@ public class MainActivity extends AppCompatActivity {
 					return true;
 				}
 			});
+			openDocument(getIntent());
+		}
+		else {
+			ErrorDialog.show(this, R.string.error_bogus_intent, true);
+		}
+	}
+
+	@Override
+	protected void onNewIntent(final Intent intent) {
+		super.onNewIntent(intent);
+		if(isFileIntent(intent)) {
+			if(!intent.getData().equals(getIntent().getData())) {
+				closeDocument();
+				setIntent(intent);
+				openDocument(intent);
+			}
+		}
+		else {
+			ErrorDialog.show(this, R.string.error_bogus_intent, false);
+		}
+	}
+
+	private static boolean isFileIntent(final Intent intent) {
+		return intent != null && Intent.ACTION_VIEW.equals(intent.getAction()) &&
+				intent.getData() != null && SCHEME_FILE.equals(intent.getData().getScheme());
+	}
+
+	private Document mDocument;
+	private ReadingStrategyFactory mReadingStrategyFactory;
+	private ReadingStrategy mReadingStrategy;
+	private OpenAsync mOpenAsync;
+	private RenderAsync mRenderAsync;
+	private DialogFragment mWaitDialog;
+
+	private void openDocument(@NonNull final Intent intent) {
+		mWaitDialog = WaitDialog.show(MainActivity.this, R.string.opening);
+		final String file = intent.getData().getPath();
+		Log.d(TAG, "opening " + file);
+		mOpenAsync = Document.open(file, new Callback<Document>() {
+			@Override
+			public void onResult(final Document result) {
+				dismissWaitDialog();
+				mOpenAsync = null;
+				prepareDocument(result);
+			}
+
+			@Override
+			public void onError(final Throwable error) {
+				dismissWaitDialog();
+				mOpenAsync = null;
+				ErrorDialog.show(MainActivity.this, R.string.error_opening, true);
+				if(error != null) {
+					Log.w(TAG, "file error", error);
+				}
+			}
+		});
+	}
+
+	private void prepareDocument(@NonNull final Document document) {
+		if(document.getPageCount() > 0) {
+			document.setPage(0);
+			mDocument = document;
 			/* If this isn't posted, sometimes the image view hasn't been
 			 * measured when it tries to render.  This happens consistently
 			 * with certain files and not with others. */
 			mHandler.post(new Runnable() {
 				@Override
 				public void run() {
+					// TODO this could be a persistent setting
 					setReadingStrategy(ReadingStrategyFactory.getDefault());
 				}
 			});
@@ -129,6 +119,28 @@ public class MainActivity extends AppCompatActivity {
 		else {
 			ErrorDialog.show(this, R.string.error_empty_document, true);
 		}
+	}
+
+	private void closeDocument() {
+		if(mOpenAsync != null) {
+			mOpenAsync.cancel(true);
+			mOpenAsync = null;
+			dismissWaitDialog();
+		}
+		if(mDocument != null) {
+			mDocument.close();
+			mDocument = null;
+		}
+		cancelRender();
+		mReadingStrategyFactory = null;
+		mReadingStrategy = null;
+	}
+
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		closeDocument();
+		recycleImageViewBitmap();
 	}
 
 	void setReadingStrategy(final ReadingStrategyFactory factory) {
@@ -139,21 +151,23 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 
-	private final Runnable mRenderDialogDelay = new Runnable() {
+	private final Runnable mShowRenderingDialogTask = new Runnable() {
 		@Override
 		public void run() {
 			mWaitDialog = WaitDialog.show(MainActivity.this, R.string.rendering);
 		}
 	};
 
+	private static final long SHOW_RENDER_DIALOG_DELAY = 1000L;
+
 	private void render() {
 		cancelRender();
-		mHandler.postDelayed(mRenderDialogDelay, 1000);
+		mHandler.postDelayed(mShowRenderingDialogTask, SHOW_RENDER_DIALOG_DELAY);
 		mRenderAsync = mReadingStrategy.render(mImageView.getWidth(), mImageView.getHeight(), new Callback<Bitmap>() {
 			@Override
 			public void onResult(final Bitmap result) {
 				mRenderAsync = null;
-				mHandler.removeCallbacks(mRenderDialogDelay);
+				mHandler.removeCallbacks(mShowRenderingDialogTask);
 				dismissWaitDialog();
 				recycleImageViewBitmap();
 				mImageView.setImageBitmap(result);
@@ -162,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
 			@Override
 			public void onError(final Throwable error) {
 				mRenderAsync = null;
-				mHandler.removeCallbacks(mRenderDialogDelay);
+				mHandler.removeCallbacks(mShowRenderingDialogTask);
 				dismissWaitDialog();
 				ErrorDialog.show(MainActivity.this, R.string.error_rendering, false);
 				if(error != null) {
@@ -170,6 +184,15 @@ public class MainActivity extends AppCompatActivity {
 				}
 			}
 		});
+	}
+
+	private void cancelRender() {
+		if(mRenderAsync != null) {
+			mRenderAsync.cancel(true);
+			mRenderAsync = null;
+			mHandler.removeCallbacks(mShowRenderingDialogTask);
+			dismissWaitDialog();
+		}
 	}
 
 	private void showOptionsPopup() {
@@ -181,15 +204,6 @@ public class MainActivity extends AppCompatActivity {
 			}
 		});
 		popup.showAtLocation(findViewById(R.id.root), Gravity.BOTTOM, 0, 0);
-	}
-
-	private void cancelRender() {
-		if(mRenderAsync != null) {
-			mRenderAsync.cancel(true);
-			mRenderAsync = null;
-			mHandler.removeCallbacks(mRenderDialogDelay);
-			dismissWaitDialog();
-		}
 	}
 
 	private void dismissWaitDialog() {
